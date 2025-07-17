@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Juego de Interés Simple (Offline)</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background-image: linear-gradient(120deg, #d4fc79 0%, #96e6a1 100%);
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    h1 { color: #2e2e2e; margin-bottom: 10px; }
+    .container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-around;
+    }
+    .team {
+      background-color: #fff;
+      border-radius: 12px;
+      box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+      padding: 20px;
+      width: 300px;
+      margin: 15px;
+      transition: transform 0.3s;
+    }
+    .team:hover { transform: scale(1.02); }
+    .progress-circle {
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      background: conic-gradient(#28a745 0%, #e0e0e0 0%);
+      margin: 10px auto;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .progress-circle span {
+      font-weight: bold;
+      font-size: 18px;
+    }
+    input {
+      padding: 10px;
+      font-size: 16px;
+      width: 90%;
+      margin-bottom: 10px;
+    }
+    button {
+      background-color: #28a745;
+      border: none;
+      padding: 10px 15px;
+      color: white;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+    button:hover { background-color: #1e7e34; }
+    .message {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+    .correct { color: green; }
+    .incorrect { color: red; }
+    #scoreboard {
+      background-color: white;
+      margin: 20px auto;
+      padding: 15px;
+      max-width: 500px;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+    }
+    #scoreboard h2 { margin-top: 0; color: #333; }
+    .score { font-size: 18px; margin: 5px; }
+  </style>
+</head>
+<body>
+
+  <h1>💵 Interés Simple por Equipos</h1>
+
+  <div id="scoreboard">
+    <h2>🧮 Tabla de Puntos</h2>
+    <div id="scores"></div>
+  </div>
+
+  <div class="container" id="teams-container"></div>
+
+  <!-- Sonidos embebidos en base64 -->
+  <audio id="audioCorrecto">
+    <source src="data:audio/ogg;base64,T2dnUwACAAAAAAAAAABVDlYzAAAAANPCeH0BHgF2b3JiaXMAAAAAAkSsAAAAAAAEANiDFXNvdW5kcy92MS4wL2NhcnRvb24vY2xhbmdfYW5kX3dvYmJsZS5vZ2c=" type="audio/ogg">
+  </audio>
+  <audio id="audioIncorrecto">
+    <source src="data:audio/ogg;base64,T2dnUwACAAAAAAAAAADrFRYzAAAAAEZn+eYBHgF2b3JiaXMAAAAAAkSsAAAAAAAEANiD1XNvdW5kcy92MS4wL2NhcnRvb24vd29vZF9wbGFua19mbGlja3Mub2dn" type="audio/ogg">
+  </audio>
+
+  <script>
+    const equipos = 3;
+    const tiempoInicial = 300;
+    const equiposData = [];
+    const puntajes = Array(equipos).fill(0);
+    let intervalos = [];
+
+    function generarProblema() {
+      const capital = Math.floor(Math.random() * 9000) + 1000;
+      const tasa = Math.floor(Math.random() * 16) + 5;
+      const tiempo = Math.floor(Math.random() * 10) + 1;
+      const interes = (capital * tasa * tiempo / 100).toFixed(2);
+      return { capital, tasa, tiempo, interes };
+    }
+
+    const container = document.getElementById('teams-container');
+    for (let i = 0; i < equipos; i++) {
+      const problema = generarProblema();
+      equiposData.push({
+        tiempo: tiempoInicial,
+        ...problema
+      });
+
+      container.innerHTML += `
+        <div class="team" id="team-${i}">
+          <h2>Equipo ${i + 1}</h2>
+          <div class="progress-circle" id="progress-${i}">
+            <span id="timer-${i}">${formatearTiempo(tiempoInicial)}</span>
+          </div>
+          <p>¿Cuál es el interés generado por $${problema.capital} durante ${problema.tiempo} años a una tasa de ${problema.tasa}%?</p>
+          <input type="text" id="respuesta-${i}" placeholder="Ingresa el interés ($)">
+          <button onclick="verificar(${i})">Verificar</button>
+          <div class="message" id="mensaje-${i}"></div>
+        </div>
+      `;
+    }
+
+    function formatearTiempo(segundos) {
+      const min = Math.floor(segundos / 60);
+      const seg = segundos % 60;
+      return `${min}:${seg < 10 ? '0' : ''}${seg}`;
+    }
+
+    function actualizarTiempo(index) {
+      if (equiposData[index].tiempo > 0) {
+        equiposData[index].tiempo--;
+        document.getElementById(`timer-${index}`).textContent = formatearTiempo(equiposData[index].tiempo);
+        const progreso = (equiposData[index].tiempo / tiempoInicial) * 100;
+        document.getElementById(`progress-${index}`).style.background = `conic-gradient(#28a745 ${progreso}%, #e0e0e0 ${progreso}%)`;
+      } else {
+        clearInterval(intervalos[index]);
+        const msg = document.getElementById(`mensaje-${index}`);
+        msg.textContent = "⏰ Tiempo agotado.";
+        msg.className = "message incorrect";
+      }
+    }
+
+    intervalos = equiposData.map((_, i) => setInterval(() => actualizarTiempo(i), 1000));
+
+    function verificar(index) {
+      const input = parseFloat(document.getElementById(`respuesta-${index}`).value);
+      const esperado = parseFloat(equiposData[index].interes);
+      const mensaje = document.getElementById(`mensaje-${index}`);
+      const correcto = Math.abs(input - esperado) < 0.01;
+
+      if (correcto) {
+        mensaje.textContent = "✅ ¡Correcto!";
+        mensaje.className = "message correct";
+        puntajes[index] += 100;
+        document.getElementById("audioCorrecto").play();
+      } else {
+        mensaje.textContent = `❌ Incorrecto. Era $${esperado}`;
+        mensaje.className = "message incorrect";
+        document.getElementById("audioIncorrecto").play();
+      }
+      actualizarTablaPuntos();
+    }
+
+    function actualizarTablaPuntos() {
+      const scoresDiv = document.getElementById("scores");
+      scoresDiv.innerHTML = "";
+      puntajes.forEach((p, i) => {
+        scoresDiv.innerHTML += `<div class="score">🏅 Equipo ${i + 1}: ${p} puntos</div>`;
+      });
+    }
+
+    actualizarTablaPuntos();
+  </script>
+</body>
+</html>
